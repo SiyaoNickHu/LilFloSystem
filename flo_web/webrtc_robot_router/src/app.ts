@@ -166,7 +166,7 @@ class ReconnectigWS {
 }
 
 const socketPort = 9091;
-const webUri = 'wss://192.168.1.7/host/webrtc'; // process.env.FLO_SERVER_IP; //TODO: bring in as an environment var
+const webUri = 'wss://lilflo.com/host/webrtc'; // process.env.FLO_SERVER_IP; //TODO: bring in as an environment var
 const rtcServer = 'localhost';
 const connections: Record<string, WebSocket> = {};
 const bufferedMsgs: Map<string, [string]> = new Map();
