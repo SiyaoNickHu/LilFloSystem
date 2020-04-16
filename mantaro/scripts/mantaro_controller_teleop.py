@@ -2,8 +2,9 @@
 
 import rospy
 import serial
+import threading
 from geometry_msgs.msg import Twist
-from mantaro.srv import Mantaro, MantaroResponse
+from std_msgs.msg import Float32
 
 MAX_SPD_PCT = 25
 
@@ -13,53 +14,26 @@ class MantaroController:
         self.prev_command_time = rospy.get_time()
         self.sub_base = rospy.Subscriber('/keyop_vel_smoother/raw_cmd_vel', Twist, self.base_callback)
         self.sub_pan_tilt = rospy.Subscriber('/keyop_vel_smoother/cam_raw_cmd_vel', Twist, self.pan_tilt_callback)
-        # self.server = rospy.Service('mantaro_control', Mantaro, self.mantaro_control)
+        self.battery_pub = rospy.Publisher('/mantaro_battery/voltage', Float32, queue_size=1)
         self.fb_gain = fb_gain
         self.lr_gain = lr_gain
+        self.t = threading.Thread(target=self.battery_logger)
+        self.t.daemon = True
+        self.l = threading.Lock()
+        self.t.start()
 
-    def mantaro_control(self, req):
-        if req.command == req.START:
-            self.ser.write('X.S.0.0.0.0.0.0.\r')
-            print 'start'
-            resp = MantaroResponse()
-            resp.res = -1
-            return resp
-        elif req.command == req.STOP:
-            self.ser.write('X.C.0.0.0.0.0.0.\r')
-            print 'stop'
-            resp = MantaroResponse()
-            resp.res = -1
-            return resp
-        elif req.command == req.BATTERY:
-            self.ser.write('X.B.0.0.0.0.0.0.\r')
-            print 'battery'
-            ret = self.ser.readline()
-            resp = MantaroResponse()
-            resp.res = float(ret[1:5])
-            return resp
-        elif req.command == req.STATUS:
-            self.ser.write('X.P.0.0.0.0.0.0.\r')
-            print 'status'
-            ret = self.ser.readline()
-            resp = MantaroResponse()
-            if ret[0] == 'C':
-                resp.res = resp.HALTED
-            elif ret[0] == 'S':
-                resp.res = resp.STARTED
-            elif ret[0] == 'F':
-                resp.res = resp.LOWVOLT
-            return resp
+    def battery_logger(self):
+        while 1:
+            with self.l:
+                self.ser.write('X.B.0.0.0.0.0.0.\r')
+                data = self.ser.readline()
+            if len(data) > 5:
+                self.battery_pub.publish(float(data[1:5]) / 100.0)
+            rospy.sleep(2)
 
     def base_callback(self, data):
         if rospy.get_time()-self.prev_command_time < 0.25:
             return
-
-        # if data.angular.z > 0:
-        #     l_command = self.fb_gain * data.linear.x + self.lr_gain * abs(data.angular.z) / 4
-        #     r_command = self.fb_gain * data.linear.x + self.lr_gain * abs(data.angular.z) 
-        # else:
-        #     l_command = self.fb_gain * data.linear.x + self.lr_gain * abs(data.angular.z) 
-        #     r_command = self.fb_gain * data.linear.x + self.lr_gain * abs(data.angular.z) / 4
 
         if data.linear.x < 0:
             l_command = self.fb_gain * -data.linear.x
@@ -72,7 +46,9 @@ class MantaroController:
         
         command = 'L.%d.%d.%d.R.%d.%d.%d.\r' % (direction, l_command/10, l_command%10, 
                                                 direction, r_command/10, r_command%10)
-        self.ser.write(command)
+        with self.l:
+            self.ser.write(command)
+            self.ser.readline()
         self.prev_command_time = rospy.get_time()
 
     def pan_tilt_callback(self, data):
@@ -89,8 +65,9 @@ class MantaroController:
         elif data.angular.y < 0:
             self.ser.write('M.U.0.0.0.0.0.0.\r')
 
+        with self.l:
+            self.ser.readline()
         self.prev_command_time = rospy.get_time()
-
 
 
 def run():
@@ -98,14 +75,8 @@ def run():
 
     with serial.Serial('/dev/Mantaro', 57600, xonxoff=True, timeout=0.5) as ser:
         rospy.sleep(2)
-        ser.write('X.P.0.0.0.0.0.0.\r')
-        print ser.readline()
-
-        ser.write('X.B.0.0.0.0.0.0.\r')
-        print ser.readline()
 
         ser.write('X.S.0.0.0.0.0.0.\r')
-        print 'starting board'
 
         controller = MantaroController(ser)
         rospy.spin()

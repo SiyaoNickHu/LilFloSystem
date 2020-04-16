@@ -2,15 +2,12 @@
 
 import rospy
 import curses
-from mantaro.srv import MantaroRequest, Mantaro
 from geometry_msgs.msg import Twist
 
 def run(stdscr):
     rospy.init_node('mantaro_fake_controller')
     pub_base = rospy.Publisher('/keyop_vel_smoother/raw_cmd_vel', Twist, queue_size=1)
     pub_cam = rospy.Publisher('/keyop_vel_smoother/cam_raw_cmd_vel', Twist, queue_size=1)
-    # rospy.wait_for_service('mantaro_control')
-    # mantaro_controller = rospy.ServiceProxy('mantaro_control', Mantaro)
     stdscr.nodelay(1)
     while True:
         c = stdscr.getch()
