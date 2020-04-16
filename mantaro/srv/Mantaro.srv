@@ -1,0 +1,10 @@
+int8 START=0
+int8 STOP=1
+int8 BATTERY=2
+int8 STATUS=3
+int8 command
+---
+float64 STARTED=0
+float64 HALTED=1
+float64 LOWVOLT=2
+float64 res
