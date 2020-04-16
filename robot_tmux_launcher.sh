@@ -2,14 +2,14 @@
 
 source ~/.bashrc
 
-export FLO_SERVER_IP="192.168.1.7"
+export FLO_SERVER_IP="lilflo.com"
 
 tmux new-session -d -s flo
 tmux rename-window startup
 tmux send-keys 'roscore' Enter
 
 tmux split-window -t flo
-tmux send-keys 'mon launch --name=flo_launcher flo_core flo_bringup.launch' Enter
+tmux send-keys 'mon launch --name=flo_launcher mantaro mantaro_bringup.launch' Enter
 
 tmux split-window -t flo -h
 tmux send-keys 'htop' Enter
