@@ -41,6 +41,7 @@ from rosbridge_library.capabilities.publish import Publish
 from rosbridge_library.capabilities.advertise import Advertise
 from wsConnector import RosbridgeWebSocket
 from rosbridge_server import ClientManager
+import os
 import rospy
 import sys
 
@@ -67,6 +68,7 @@ class ReconnectingWebSocketClientFactory(ReconnectingClientFactory, WebSocketCli
     protocol = RosbridgeWebSocket
 
     maxDelay = 1
+
 
 if __name__ == "__main__":
     rospy.init_node("rosbridge_websocket")
@@ -290,7 +292,14 @@ if __name__ == "__main__":
     uri = 'wss://{}/host/'.format(address)
 
     rospy.loginfo('setting factory to connect to %s', uri)
-    factory = ReconnectingWebSocketClientFactory(uri)
+    ROBOT_NAME = os.environ['ROBOT_NAME']
+    ROBOT_PASSWORD = os.environ['ROBOT_PASSWORD']
+    rospy.loginfo('connecting to server with name: %s', ROBOT_NAME)
+    HEADERS = {
+        'robotName': ROBOT_NAME,
+        'robotPassword': ROBOT_PASSWORD
+    }
+    factory = ReconnectingWebSocketClientFactory(uri, headers=HEADERS)
     factory.protocol = RosbridgeWebSocket
 
     factory.setProtocolOptions(
