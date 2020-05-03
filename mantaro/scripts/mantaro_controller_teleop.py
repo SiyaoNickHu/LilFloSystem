@@ -11,6 +11,10 @@ MAX_SPD_PCT = 25
 class MantaroController:
     def __init__(self, ser, fb_gain=60, lr_gain=30):
         self.ser = ser # serial object
+        self.ser.write('M.C.0.0.0.0.0.0.\r')
+        for i in range(4):
+            rospy.sleep(0.5)
+            self.ser.write('M.D.0.0.0.0.0.0.\r')
         self.prev_command_time = rospy.get_time()
         self.sub_base = rospy.Subscriber('/keyop_vel_smoother/raw_cmd_vel', Twist, self.base_callback)
         self.sub_pan_tilt = rospy.Subscriber('/keyop_vel_smoother/cam_raw_cmd_vel', Twist, self.pan_tilt_callback)
