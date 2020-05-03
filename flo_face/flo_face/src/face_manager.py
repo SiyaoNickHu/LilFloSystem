@@ -7,7 +7,7 @@ import rospkg
 from flo_face_defs.msg import FaceState
 from flo_face_defs.srv import (GetFaceOptions, GetFaceOptionsResponse,
                                SetEyeDirection, SetEyeDirectionResponse,
-                               SetFace, SetFaceResponse,
+                               SetFace, SetFaceResponse, SetFaceRequest,
                                SetFaceBrightness, SetFaceBrightnessResponse)
 
 
@@ -45,6 +45,7 @@ class FloFaceManager(object):
             'set_face_brightness', SetFaceBrightness, self.set_brightness)
         # self.set_face(SetFace(self.current_mouth))
         rospy.loginfo('face manager up')
+        self.set_face(SetFaceRequest('sleep'))
         rospy.spin()
 
     def get_face_options(self, _):
@@ -56,7 +57,7 @@ class FloFaceManager(object):
         return GetFaceOptionsResponse(self.mouth_keys)
 
     def set_face(self, request):
-        """Recieve a request to set the face. Load the new mouth and
+        """Receive a request to set the face. Load the new mouth and
         the eyes into the new state structure and the current mouth
         and eyes. If the new face doesn't have the current eye
         type/direction, the eyes will be set to their default.

@@ -20,7 +20,7 @@ echo "installing for ros version: ${ROS_VERSION}"
 sudo apt-get install -y ros-${ROS_VERSION}-desktop-full
 source /opt/ros/${ROS_VERSION}/setup.bash
 
-
+sudo apt-get install -y python-rosdep2
 [ ! -d "/etc/ros/rosdep/sources.list.d" ] && sudo rosdep init
 rosdep update
 sudo apt-get install -y python-rosinstall python-rosinstall-generator python-wstool build-essential

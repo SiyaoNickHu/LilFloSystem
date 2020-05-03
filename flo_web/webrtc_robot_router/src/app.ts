@@ -7,9 +7,16 @@ import { v4 as uuidv4 } from 'uuid';
 //import bcrypt from "bcrypt";
 //import passport from "passport";
 //import session from "express-session";
+import winston from 'winston';
 
-// TODO: for testing only, very dangerous
-process.env['NODE_TLS_REJECT_UNAUTHORIZED'] = '0';
+const logger = winston.createLogger({
+    level: 'info',
+    format: winston.format.prettyPrint(),
+    transports: [
+        new winston.transports.Console({
+        }),
+    ],
+});
 
 class ReconnectigWS {
     /**
@@ -78,14 +85,14 @@ class ReconnectigWS {
     }
 
     connect() {
-        console.log('connecting to server');
+        logger.info('connecting to server');
         this.connecting = false;
         if (this.sock !== undefined) {
             this.sock.removeAllListeners();
         }
         const robotName = process.env['ROBOT_NAME'];
         const robotPassword = process.env['ROBOT_PASSWORD'];
-        console.log('connecting with name: ' + robotName);
+        logger.info(`connecting to ${this.url} with name: ${robotName}`);
         this.sock = new WebSocket(this.url, {
             headers: {
                 robotName: robotName,
@@ -98,11 +105,13 @@ class ReconnectigWS {
         }
 
         this.sock.on('message', (msg: string) => {
+            logger.info('message from server', {msg});
             this.heartbeat();
             this.onMessage(msg);
         });
 
         this.sock.on('open', () => {
+            logger.info('socket opened with server');
             this.heartbeat();
             // Setup ping to go out every so often.
             this.pingTimer = setInterval(() => {
@@ -111,25 +120,30 @@ class ReconnectigWS {
                 }
             }, this.pingFreq);
             for (const msg of this.buffer) {
+                logger.info('sending buffered message to server',{msg});
                 (this.sock as WebSocket).send(msg);
             }
         });
 
         this.sock.on('error', (err) => {
+            logger.error('error with server ws', {err});
             this.onError(err);
             this.reconnect();
         });
 
         this.sock.on('close', () => {
+            logger.info('server ws closing');
             this.onClose();
             this.reconnect();
         });
 
         this.sock.on('ping', () => {
+            logger.silly('ping from server');
             this.heartbeat();
         });
 
         this.sock.on('pong', () => {
+            logger.silly('pong from server');
             this.heartbeat();
         });
     }
@@ -161,10 +175,10 @@ class ReconnectigWS {
             msg = JSON.stringify(msg);
         }
         if (this.sock == undefined) {
-            console.error('Socket is not connected');
+            logger.error('Socket is not connected to server');
             return;
         }
-        console.log('sending message to server: ' + msg);
+        logger.info('sending message to server', {msg});
         if (this.sock.readyState === WebSocket.OPEN) {
             this.sock.send(msg);
         } else {
@@ -174,7 +188,8 @@ class ReconnectigWS {
 }
 
 const socketPort = 9091;
-const webUri = 'wss://lilflo.com/host/webrtc'; // process.env.FLO_SERVER_IP; //TODO: bring in as an environment var
+const webUri =
+    'wss://' + (process.env.FLO_SERVER_IP || 'lilflo.com') + '/host/webrtc';
 const rtcServer = 'localhost';
 const connections: Record<string, WebSocket> = {};
 const bufferedMsgs: Map<string, [string]> = new Map();
@@ -182,15 +197,17 @@ const bufferedMsgs: Map<string, [string]> = new Map();
 const connection = new ReconnectigWS(webUri);
 
 function sendUp(id: string, command: string, msg: string) {
-    connection.send({
+    const pack = {
         id: id,
         command: command,
         msg: msg,
-    });
+    };
+    logger.info('sending to server',{msg})
+    connection.send(pack);
 }
 
-connection.onMessage = (msg) => {
-    console.log('message received: ' + msg);
+connection.onMessage = (msg: string): void => {
+    logger.info('message received from server', {msg});
     const msgObj = JSON.parse(msg);
     const id = msgObj['id'];
     const command = msgObj['command'];
@@ -199,7 +216,7 @@ connection.onMessage = (msg) => {
         const ws = new WebSocket(
             'ws://' + rtcServer + ':' + socketPort + '/webrtc',
         );
-        console.log('opened new local websocket for id: ' + id);
+        logger.info('opened new local websocket', {id});
         connections[id] = ws;
         ws.on('message', (msg: string) => {
             sendUp(id, 'msg', msg);
@@ -209,10 +226,11 @@ connection.onMessage = (msg) => {
         });
         ws.on('open', () => {
             const thisBuffer = bufferedMsgs.get(id);
-            console.log('ws to roswebrtc opened, exiting bufer: ' + thisBuffer);
+            bufferedMsgs.delete(id);
+            logger.info('ws to roswebrtc opened, clearing bufer', {thisBuffer});
             if (thisBuffer !== undefined) {
                 for (msg of thisBuffer) {
-                    console.log('sending from buffer: ' + msg);
+                    logger.info('sending from buffer', {msg});
                     ws.send(msg);
                 }
             }
@@ -225,7 +243,7 @@ connection.onMessage = (msg) => {
         });
     } else if (command === 'msg') {
         const toSend = msgObj['msg'];
-        console.log('sending message to roswebrtc: ' + msg);
+        logger.info('sending message to roswebrtc', {id:msgObj['id'],msg:toSend});
         if (connections[id].readyState === WebSocket.CONNECTING) {
             const existingBuffer = bufferedMsgs.get(id);
             if (existingBuffer === undefined) {
@@ -239,13 +257,13 @@ connection.onMessage = (msg) => {
     } else if (command === 'close') {
         const thisConnection = connections[id];
         if (thisConnection !== undefined) {
-            console.log('closing ws connection to webrtc ros id: ' + id);
+            logger.info('closing ws connection to webrtc ros id', {id});
             thisConnection.close();
             delete connections[id];
         } else {
-            console.log(
-                'ws connectin commanded to close by server, but already closed. ID: ' +
-                    id,
+            logger.info(
+                'ws connectin commanded to close by server, but already closed. ID',
+                {id},
             );
         }
     } else if (command === 'ping') {
@@ -253,6 +271,6 @@ connection.onMessage = (msg) => {
     } else if (command === 'pong') {
         connections[id].pong();
     } else {
-        console.error('got an invalid command');
+        logger.info('got an invalid command');
     }
 };

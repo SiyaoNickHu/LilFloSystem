@@ -80,16 +80,16 @@ class StatsPublisher(object):
             A dictionary with the fields `link_quality` and `signal_level`
         """
         try:
-            proc = subprocess.Popen('iwconfig | grep Link', shell=True,
+            proc = subprocess.Popen('/sbin/iwconfig | grep Link', shell=True,
                                     stdout=subprocess.PIPE, stderr=subprocess.PIPE)
             output, err = proc.communicate()
             if not output:
                 if err:
                     rospy.logdebug(
-                        'no output recieved while checking net strength, got error:\n%s', err)
+                        'no output received while checking net strength, got error:\n%s', err)
                 else:
                     rospy.logdebug(
-                        'no output recieved while checking net strength')
+                        'no output received while checking net strength')
 
             msg = output.decode('utf-8')
             lqv = re.split(
